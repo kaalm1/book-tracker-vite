@@ -8,6 +8,8 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as functions from "firebase-functions";
 import { onRequest } from 'firebase-functions/v2/https';
+import * as logger from 'firebase-functions/logger';
+import { v4 as uuidv4 } from 'uuid';
 
 
 // Initialize Firebase Admin
@@ -26,6 +28,7 @@ const getTransporter = () => {
   };
 
 interface SearchResult {
+  id: string;
   title: string;
   price: string;
   source: string;
@@ -50,7 +53,7 @@ interface User {
 
 // Scheduled function to run daily book searches
 export const dailyBookSearch = onSchedule({
-  schedule: '0 9 * * *',
+  schedule: '0 9 1 * *',
   timeZone: 'America/New_York',
   region: 'us-central1',
   memory: '512MiB',
@@ -125,21 +128,41 @@ export const searchBook = onCall({
   memory: '256MiB',
   timeoutSeconds: 60,
   enforceAppCheck: false, // Set to true if you're using App Check
+  invoker: 'public',
 }, async (request) => {
+
+  logger.log('SEARCH_BOOK_TRIGGERED', {
+    userId: request.auth?.uid,
+    bookTitle: request.data.bookTitle?.substring(0, 50), // Truncate long titles
+    timestamp: new Date().toISOString()
+  });
+
   if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated');
+    logger.warn('UNAUTHENTICATED_REQUEST', { ip: request.rawRequest.ip });
+    throw new HttpsError('unauthenticated', 'Authentication required');
   }
   
   const { bookTitle, author } = request.data;
   
   if (!bookTitle) {
-    throw new HttpsError('invalid-argument', 'Book title is required');
-  }
+      logger.error('MISSING_TITLE');
+      throw new HttpsError('invalid-argument', 'Book title is required');
+    }
   
   try {
+    logger.log('STARTING_SEARCH', { bookTitle: bookTitle.substring(0, 50) });
     const results = await searchAllPlatforms(bookTitle, author);
+    logger.log('SEARCH_COMPLETED', { resultCount: results.length });
     return { results, searchedAt: new Date().toISOString() };
   } catch (error) {
+    logger.error('SEARCH_FAILED', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      requestData: {
+        bookTitle: request.data.bookTitle?.substring(0, 30),
+        author: request.data.author?.substring(0, 30)
+      }
+    });
     console.error('Error in manual search:', error);
     throw new HttpsError('internal', 'Search failed');
   }
@@ -221,15 +244,16 @@ async function searchAllPlatforms(bookTitle: string, author?: string): Promise<S
         console.error('Craigslist search failed:', err);
         return [];
       }),
-      searchReddit(searchQuery).catch(err => {
-        console.error('Reddit search failed:', err);
-        return [];
-      }),
-      // eBay search could be added here
-      searcheBay(searchQuery).catch(err => {
-        console.error('eBay search failed:', err);
-        return [];
-      })
+      // TODO: These don't work yet, need to implement proper scraping or API access
+      // searchReddit(searchQuery).catch(err => {
+      //   console.error('Reddit search failed:', err);
+      //   return [];
+      // }),
+      // // eBay search could be added here
+      // searcheBay(searchQuery).catch(err => {
+      //   console.error('eBay search failed:', err);
+      //   return [];
+      // })
     ];
     
     const allResults = await Promise.all(searchPromises);
@@ -276,6 +300,7 @@ async function searcheBay(searchQuery: string): Promise<SearchResult[]> {
       
       if (title && !title.toLowerCase().includes('shop on ebay')) {
         results.push({
+          id: uuidv4(),
           title: title,
           price: price || 'Price not listed',
           source: 'eBay',
@@ -324,6 +349,7 @@ async function searchCraigslist(searchQuery: string): Promise<SearchResult[]> {
           searchQuery.split(' ').some(word => titleLower.includes(word.toLowerCase()))) {
         
         results.push({
+          id: uuidv4(),
           title: title,
           price: price || 'Price not listed',
           source: `Craigslist${location ? ` ${location}` : ''}`,
@@ -380,6 +406,7 @@ async function searchReddit(searchQuery: string): Promise<SearchResult[]> {
             const priceMatch = (title + ' ' + text).match(/\$(\d+(?:\.\d{2})?)/);
             
             results.push({
+              id: uuidv4(),
               title: title,
               price: priceMatch ? `$${priceMatch[1]}` : 'See post for price',
               source: `Reddit r/${postData.subreddit}`,
