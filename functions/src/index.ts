@@ -7,6 +7,7 @@ import * as nodemailer from 'nodemailer';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as functions from "firebase-functions";
+import { onRequest } from 'firebase-functions/v2/https';
 
 
 // Initialize Firebase Admin
@@ -631,4 +632,17 @@ export const healthCheck = onCall({
     timestamp: new Date().toISOString(),
     version: '2.0.0'
   };
+});
+
+
+export const api = onRequest({ 
+  region: 'us-central1',
+  memory: '128MiB',
+  timeoutSeconds: 10,
+}, (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: '2.0.0'
+  });
 });
