@@ -330,6 +330,7 @@ async function searchCraigslist(searchQuery: string): Promise<SearchResult[]> {
           condition: 'Used'
         });
       }
+      return;
     });
     
     return results;
