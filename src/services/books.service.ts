@@ -22,7 +22,7 @@ import {
           userId,
           addedDate: new Date().toISOString().split('T')[0]
         };
-  
+        console.log(bookData);
         const docRef = await addDoc(collection(db, 'books'), bookData);
   
         return {

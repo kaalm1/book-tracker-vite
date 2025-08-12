@@ -33,7 +33,7 @@ export const useBooks = (userId: string | null) => {
 
     try {
       setError(null);
-      const newBook = await booksService.addBook(userId, { title, author });
+      const newBook = await booksService.addBook(userId, { title, author: author || '' });
       setBooks(prev => [newBook, ...prev]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add book');
