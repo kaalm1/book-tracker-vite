@@ -10,6 +10,14 @@ import * as functions from "firebase-functions";
 import { onRequest } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import { v4 as uuidv4 } from 'uuid';
+import snoowrap from 'snoowrap';
+import { defineSecret } from 'firebase-functions/params';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+
+const redditClientId = defineSecret('VITE_REDDIT_CLIENT_ID');
+const redditClientSecret = defineSecret('VITE_REDDIT_CLIENT_SECRET');
+const redditUsername = defineSecret('VITE_REDDIT_USERNAME');
+const redditPassword = defineSecret('VITE_REDDIT_PASSWORD');
 
 
 // Initialize Firebase Admin
@@ -238,22 +246,32 @@ async function searchAllPlatforms(bookTitle: string, author?: string): Promise<S
   const searchQuery = author ? `${bookTitle} ${author}` : bookTitle;
   
   try {
+    const functions = getFunctions();
+    
+    // Get reference to the callable function
+    const searchRedditCallable = httpsCallable<{ searchQuery: string }, SearchResult[] >(
+      functions, 
+      'searchRedditCallable'
+    );
+
     // Search platforms in parallel but with error handling
     const searchPromises = [
       searchCraigslist(searchQuery).catch(err => {
         console.error('Craigslist search failed:', err);
         return [];
       }),
-      // TODO: These don't work yet, need to implement proper scraping or API access
-      // searchReddit(searchQuery).catch(err => {
-      //   console.error('Reddit search failed:', err);
-      //   return [];
-      // }),
-      // // eBay search could be added here
-      // searcheBay(searchQuery).catch(err => {
-      //   console.error('eBay search failed:', err);
-      //   return [];
-      // })
+      searchRedditCallable({ searchQuery })
+        .then((response) => {
+          return response.data;
+        })
+        .catch(err => {
+          console.error('Reddit search failed:', err);
+          return [];
+        }),
+      searcheBay(searchQuery).catch(err => {
+        console.error('eBay search failed:', err);
+        return [];
+      })
     ];
     
     const allResults = await Promise.all(searchPromises);
@@ -274,6 +292,7 @@ async function searchAllPlatforms(bookTitle: string, author?: string): Promise<S
 }
 
 async function searcheBay(searchQuery: string): Promise<SearchResult[]> {
+  logger.info('Searching eBay for:', searchQuery);
   try {
     // eBay search using their basic search (no API key required)
     const searchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(searchQuery + ' book')}&_sacat=267&LH_Sold=0&LH_Complete=0`;
@@ -318,6 +337,7 @@ async function searcheBay(searchQuery: string): Promise<SearchResult[]> {
 }
 
 async function searchCraigslist(searchQuery: string): Promise<SearchResult[]> {
+  logger.info('Searching Craigslist for:', searchQuery);
   try {
     const searchUrl = `https://craigslist.org/search/sss?query=${encodeURIComponent(searchQuery)}`;
     
@@ -368,7 +388,16 @@ async function searchCraigslist(searchQuery: string): Promise<SearchResult[]> {
 }
 
 async function searchReddit(searchQuery: string): Promise<SearchResult[]> {
+  logger.info('Searching Reddit for:', searchQuery);
   try {
+    const reddit = new snoowrap({
+      userAgent: 'booktracker/1.0 (by /u/JoTisch)',
+      clientId: redditClientId.value(),
+      clientSecret: redditClientSecret.value(),
+      username: redditUsername.value(),
+      password: redditPassword.value()
+    });
+
     const searchTerms = [
       `${searchQuery} for sale`,
       `selling ${searchQuery}`,
@@ -378,17 +407,15 @@ async function searchReddit(searchQuery: string): Promise<SearchResult[]> {
     const results: SearchResult[] = [];
     
     for (const term of searchTerms) {
-      const searchUrl = `https://www.reddit.com/search.json?q=${encodeURIComponent(term)}&sort=new&limit=15&t=month`;
+      const posts = await reddit.search({
+          query: term,
+          sort: 'new',
+          time: 'month',
+          limit: 15
+        });
       
-      const response = await axios.get(searchUrl, {
-        headers: {
-          'User-Agent': 'BookTracker/2.0 (by /u/booktracker)'
-        },
-        timeout: 10000
-      });
       
-      if (response.data?.data?.children) {
-        response.data.data.children.forEach((post: any) => {
+        posts.forEach((post: any) => {
           const postData = post.data;
           const title = postData.title;
           const text = postData.selftext || '';
@@ -415,7 +442,6 @@ async function searchReddit(searchQuery: string): Promise<SearchResult[]> {
             });
           }
         });
-      }
       
       // Small delay between search terms
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -432,6 +458,18 @@ async function searchReddit(searchQuery: string): Promise<SearchResult[]> {
     return [];
   }
 }
+
+export const searchRedditCallable = onCall(
+  { secrets: [redditClientId, redditClientSecret, redditUsername, redditPassword] },
+  async (request) => {
+    try {
+      const results = await searchReddit(request.data.searchQuery);
+      return {data: results};
+    } catch (error) {
+      throw new HttpsError('internal', 'Search failed', error);
+    }
+  }
+);
 
 async function sendEmailToUser(email: string, name: string, bookTitle: string, results: SearchResult[]): Promise<void> {
   try {
