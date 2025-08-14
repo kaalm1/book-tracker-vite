@@ -17,10 +17,10 @@ export async function searchReddit(searchQuery: string, credentials?: {
     password: string;
   }): Promise<SearchResult[]> {
     const creds = credentials || {
-      clientId: redditClientId.value(),
-      clientSecret: redditClientSecret.value(),
-      username: redditUsername.value(),
-      password: redditPassword.value()
+      clientId: redditClientId.value()?.trim(),
+      clientSecret: redditClientSecret.value()?.trim(),
+      username: redditUsername.value()?.trim(),
+      password: redditPassword.value()?.trim()
     };
   
     const reddit = new snoowrap({

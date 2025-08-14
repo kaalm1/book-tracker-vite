@@ -50,8 +50,8 @@ async function searchGoogleApi(searchQuery: string, credentials?: {
   }): Promise<SearchResult[]> {
 
   const creds = credentials || {
-      apiKey: googleApiKey.value(),
-      searchEngineId: googleSearchEngineId.value(),
+      apiKey: googleApiKey.value()?.trim(),
+      searchEngineId: googleSearchEngineId.value()?.trim(),
     };
   const results: SearchResult[] = [];
   
@@ -73,8 +73,6 @@ async function searchGoogleApi(searchQuery: string, credentials?: {
 
   for (const strategy of searchStrategies) {
     try {
-      console.log(`Searching with strategy: ${strategy.description}`);
-      
       const response = await axios.get<GoogleSearchResponse>(
         'https://customsearch.googleapis.com/customsearch/v1',
         {
