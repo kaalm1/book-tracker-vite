@@ -1,20 +1,12 @@
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { defineSecret } from 'firebase-functions/params';
+import { SearchResult } from '../../types/search';
 
 // Define secrets for API credentials
 const googleApiKey = defineSecret('VITE_GOOGLE_CUSTOM_SEARCH_API_KEY');
 const googleSearchEngineId = defineSecret('VITE_GOOGLE_CUSTOM_SEARCH_ENGINE_ID');
 
-interface SearchResult {
-  id: string;
-  title: string;
-  price: string;
-  source: string;
-  condition?: string;
-  link: string;
-  seller?: string;
-}
 
 interface GoogleSearchItem {
   title: string;
