@@ -1,12 +1,15 @@
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { defineSecret } from 'firebase-functions/params';
+import { getFirestore } from 'firebase-admin/firestore';
 import { SearchResult } from '../../types/search';
 
 // Define secrets for API credentials
 export const googleApiKey = defineSecret('VITE_GOOGLE_CUSTOM_SEARCH_API_KEY');
 export const googleSearchEngineId = defineSecret('VITE_GOOGLE_CUSTOM_SEARCH_ENGINE_ID');
 
+// Initialize Firestore
+const db = getFirestore();
 
 interface GoogleSearchItem {
   title: string;
@@ -44,6 +47,121 @@ interface GoogleSearchResponse {
   };
 }
 
+interface DailyQuotaDoc {
+  date: string; // YYYY-MM-DD format
+  queryCount: number;
+  lastUpdated: FirebaseFirestore.Timestamp;
+}
+
+// Constants
+const MAX_DAILY_QUERIES = 90;
+const QUOTA_COLLECTION = 'google_api_quota';
+
+/**
+ * Get current date in YYYY-MM-DD format (local timezone)
+ */
+function getCurrentDateString(): string {
+  const now = new Date();
+  return now.toISOString().split('T')[0];
+}
+
+/**
+ * Check and update daily quota usage
+ * Returns true if quota allows the request, false if exceeded
+ */
+async function checkAndUpdateQuota(requestedQueries: number = 1): Promise<boolean> {
+  const currentDate = getCurrentDateString();
+  const quotaDocRef = db.collection(QUOTA_COLLECTION).doc(currentDate);
+  
+  try {
+    return await db.runTransaction(async (transaction) => {
+      const quotaDoc = await transaction.get(quotaDocRef);
+      
+      let currentCount = 0;
+      if (quotaDoc.exists) {
+        const data = quotaDoc.data() as DailyQuotaDoc;
+        currentCount = data.queryCount || 0;
+      }
+      
+      // Check if adding requested queries would exceed the limit
+      if (currentCount + requestedQueries > MAX_DAILY_QUERIES) {
+        console.warn(`Daily quota would be exceeded. Current: ${currentCount}, Requested: ${requestedQueries}, Limit: ${MAX_DAILY_QUERIES}`);
+        return false;
+      }
+      
+      // Update the quota
+      const newCount = currentCount + requestedQueries;
+      const quotaData: DailyQuotaDoc = {
+        date: currentDate,
+        queryCount: newCount,
+        lastUpdated: new Date() as any // Firestore will convert this to Timestamp
+      };
+      
+      transaction.set(quotaDocRef, quotaData, { merge: true });
+      
+      console.log(`Quota updated. Used ${newCount}/${MAX_DAILY_QUERIES} queries for ${currentDate}`);
+      return true;
+    });
+  } catch (error) {
+    console.error('Error checking/updating quota:', error);
+    // In case of error, allow the request but log it
+    return true;
+  }
+}
+
+/**
+ * Get current quota usage for today
+ */
+async function getCurrentQuotaUsage(): Promise<{ used: number; remaining: number; date: string }> {
+  const currentDate = getCurrentDateString();
+  const quotaDocRef = db.collection(QUOTA_COLLECTION).doc(currentDate);
+  
+  try {
+    const quotaDoc = await quotaDocRef.get();
+    const used = quotaDoc.exists ? (quotaDoc.data() as DailyQuotaDoc).queryCount || 0 : 0;
+    
+    return {
+      used,
+      remaining: MAX_DAILY_QUERIES - used,
+      date: currentDate
+    };
+  } catch (error) {
+    console.error('Error getting quota usage:', error);
+    return {
+      used: 0,
+      remaining: MAX_DAILY_QUERIES,
+      date: currentDate
+    };
+  }
+}
+
+/**
+ * Clean up old quota documents (optional maintenance function)
+ * Removes quota documents older than 30 days
+ */
+async function cleanupOldQuotaDocuments(): Promise<void> {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const cutoffDate = thirtyDaysAgo.toISOString().split('T')[0];
+    
+    const oldDocsQuery = db.collection(QUOTA_COLLECTION).where('date', '<', cutoffDate);
+    const oldDocs = await oldDocsQuery.get();
+    
+    const batch = db.batch();
+    oldDocs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    if (!oldDocs.empty) {
+      await batch.commit();
+      console.log(`Cleaned up ${oldDocs.size} old quota documents`);
+    }
+  } catch (error) {
+    console.error('Error cleaning up old quota documents:', error);
+  }
+}
+
 async function searchGoogleApi(searchQuery: string, credentials?: {
     apiKey: string;
     searchEngineId: string;
@@ -71,8 +189,31 @@ async function searchGoogleApi(searchQuery: string, credentials?: {
     }
   ];
 
-  for (const strategy of searchStrategies) {
+  // Check current quota before starting
+  const quotaInfo = await getCurrentQuotaUsage();
+  console.log(`Current quota usage: ${quotaInfo.used}/${MAX_DAILY_QUERIES} for ${quotaInfo.date}`);
+  
+  if (quotaInfo.remaining <= 0) {
+    console.error('Daily quota exceeded. No searches will be performed.');
+    throw new Error(`Daily Google API quota exceeded. Used ${quotaInfo.used}/${MAX_DAILY_QUERIES} queries for ${quotaInfo.date}. Quota resets at midnight.`);
+  }
+
+  // Limit strategies based on remaining quota
+  const availableStrategies = searchStrategies.slice(0, Math.min(searchStrategies.length, quotaInfo.remaining));
+  
+  if (availableStrategies.length < searchStrategies.length) {
+    console.warn(`Limiting search strategies due to quota. Using ${availableStrategies.length} of ${searchStrategies.length} strategies.`);
+  }
+
+  for (const strategy of availableStrategies) {
     try {
+      // Check quota before each request
+      const canMakeRequest = await checkAndUpdateQuota(1);
+      if (!canMakeRequest) {
+        console.warn(`Quota exceeded, stopping search after ${results.length} strategies`);
+        break;
+      }
+
       const response = await axios.get<GoogleSearchResponse>(
         'https://customsearch.googleapis.com/customsearch/v1',
         {
@@ -98,20 +239,29 @@ async function searchGoogleApi(searchQuery: string, credentials?: {
         }
       }
 
-      // Rate limiting - Google allows 100 queries per day for free tier
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Rate limiting - add delay between requests
+      await new Promise(resolve => setTimeout(resolve, 200));
       
     } catch (error) {
       console.error(`Error in search strategy "${strategy.description}":`, error);
       
-      if (axios.isAxiosError(error) && error.response?.status === 429) {
-        console.error('Rate limit exceeded. Consider upgrading your Google API plan.');
-        break; // Stop searching if rate limited
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 429) {
+          console.error('Rate limit exceeded. Consider upgrading your Google API plan.');
+          break; // Stop searching if rate limited
+        } else if (error.response?.status === 403) {
+          console.error('API quota exceeded or invalid credentials.');
+          break;
+        }
       }
       
       continue; // Continue with next strategy on other errors
     }
   }
+
+  // Log final quota usage
+  const finalQuotaInfo = await getCurrentQuotaUsage();
+  console.log(`Search completed. Final quota usage: ${finalQuotaInfo.used}/${MAX_DAILY_QUERIES} for ${finalQuotaInfo.date}`);
 
   // Remove duplicates and filter for book-related results
   const uniqueResults = results.filter((result, index, self) =>
@@ -384,5 +534,10 @@ function getRelevanceScore(result: SearchResult): number {
   return score;
 }
 
-// Export the main function
-export { searchGoogleApi };
+// Export the main function and utility functions
+export { 
+  searchGoogleApi, 
+  getCurrentQuotaUsage, 
+  cleanupOldQuotaDocuments,
+  MAX_DAILY_QUERIES 
+};
