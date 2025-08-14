@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { searchAllPlatforms } from '../services/searchService';
 import { redditClientId, redditClientSecret, redditUsername, redditPassword } from '../services/sources/redditService';
+import {googleApiKey, googleSearchEngineId} from '../services/sources/googleApiService';
 
 
 export const searchBook = onCall({
@@ -9,7 +10,7 @@ export const searchBook = onCall({
   timeoutSeconds: 60,
   enforceAppCheck: false,
   invoker: 'public',
-  secrets: [redditClientId, redditClientSecret, redditUsername, redditPassword],
+  secrets: [redditClientId, redditClientSecret, redditUsername, redditPassword, googleApiKey, googleSearchEngineId],
 }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required');
   const { bookTitle, author } = request.data;

@@ -4,8 +4,8 @@ import { defineSecret } from 'firebase-functions/params';
 import { SearchResult } from '../../types/search';
 
 // Define secrets for API credentials
-const googleApiKey = defineSecret('VITE_GOOGLE_CUSTOM_SEARCH_API_KEY');
-const googleSearchEngineId = defineSecret('VITE_GOOGLE_CUSTOM_SEARCH_ENGINE_ID');
+export const googleApiKey = defineSecret('VITE_GOOGLE_CUSTOM_SEARCH_API_KEY');
+export const googleSearchEngineId = defineSecret('VITE_GOOGLE_CUSTOM_SEARCH_ENGINE_ID');
 
 
 interface GoogleSearchItem {
