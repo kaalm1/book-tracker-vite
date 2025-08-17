@@ -28,12 +28,12 @@ export const useBooks = (userId: string | null) => {
     }
   };
 
-  const addBook = async (title: string, author?: string) => {
+  const addBook = async (title: string, author?: string, topic?: string) => {
     if (!userId) return;
 
     try {
       setError(null);
-      const newBook = await booksService.addBook(userId, { title, author: author || '' });
+      const newBook = await booksService.addBook(userId, { title, author: author || '', topic: topic || '' });
       setBooks(prev => [newBook, ...prev]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add book');

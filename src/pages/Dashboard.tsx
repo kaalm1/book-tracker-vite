@@ -20,8 +20,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const { notifications, addNotification } = useNotifications(user.uid);
   const [showSettings, setShowSettings] = useState(false);
 
-  const handleAddBook = async (title: string, author?: string) => {
-    await addBook(title, author);
+  const handleAddBook = async (title: string, author?: string, topic?: string) => {
+    await addBook(title, author, topic);
   };
 
   const handleRemoveBook = async (bookId: string) => {

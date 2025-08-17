@@ -173,17 +173,9 @@ async function searchGoogleApi(searchQuery: string, credentials?: {
   // Multiple search strategies for better coverage
   const searchStrategies = [
     {
-      query: `"${searchQuery}" book buy purchase`,
+      query: `"${searchQuery}" buy purchase`,
       description: 'Direct book purchase search'
     },
-    {
-      query: `${searchQuery} book for sale used new`,
-      description: 'Book for sale search'
-    },
-    {
-      query: `${searchQuery} paperback hardcover price`,
-      description: 'Format-specific search'
-    }
   ];
 
   // Check current quota before starting

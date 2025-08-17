@@ -21,7 +21,8 @@ export const BookItem: React.FC<BookItemProps> = ({
       <div className="flex-1">
         <h3 className="font-medium text-gray-900">{book.title}</h3>
         <p className="text-sm text-gray-600">{book.author || 'Unknown Author'}</p>
-        <p className="text-xs text-gray-500">Added: {book.addedDate}</p>
+        <p className="text-sm text-gray-500">{book.topic || 'Unknown Topic'}</p>
+        <p className="text-xs text-gray-400">Added: {book.addedDate}</p>
       </div>
       
       <div className="flex items-center space-x-2">

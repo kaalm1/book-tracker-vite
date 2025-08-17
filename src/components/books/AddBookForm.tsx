@@ -4,20 +4,22 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../ui/Input';
 
 interface AddBookFormProps {
-  onAddBook: (title: string, author?: string) => void;
+  onAddBook: (title: string, author?: string, topic?: string) => void;
   loading?: boolean;
 }
 
 export const AddBookForm: React.FC<AddBookFormProps> = ({ onAddBook, loading }) => {
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
+  const [topic, setTopic] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (title.trim()) {
-      onAddBook(title.trim(), author.trim() || undefined);
+      onAddBook(title.trim(), author.trim() || undefined, topic.trim() || undefined);
       setTitle('');
       setAuthor('');
+      setTopic('');
     }
   };
 
@@ -40,6 +42,12 @@ export const AddBookForm: React.FC<AddBookFormProps> = ({ onAddBook, loading }) 
         value={author}
         onChange={(e) => setAuthor(e.target.value)}
         placeholder="Enter author (optional)..."
+      />
+      <Input
+        type="text"
+        value={topic}
+        onChange={(e) => setTopic(e.target.value)}
+        placeholder="Enter topic (optional)..."
       />
     </form>
   );

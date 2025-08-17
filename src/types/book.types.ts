@@ -2,6 +2,7 @@ export interface Book {
     id: string;
     title: string;
     author?: string;
+    topic?: string;
     addedDate: string;
     userId: string;
   }
