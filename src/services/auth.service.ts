@@ -2,11 +2,18 @@ import { signInWithPopup, signOut as firebaseSignOut, type User } from 'firebase
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, googleProvider, db } from './firebase';
 
+const allowedEmails = import.meta.env.VITE_ALLOWED_EMAILS ? import.meta.env.VITE_ALLOWED_EMAILS.split(',') : [];
+
 export const authService = {
   async signInWithGoogle(): Promise<User> {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+
+      if (!allowedEmails.includes(user.email)) {
+        alert("You are not authorized to use this app.");
+        await firebaseSignOut(auth);
+      }
       
       // Save user data to Firestore
       await setDoc(doc(db, 'users', user.uid), {
