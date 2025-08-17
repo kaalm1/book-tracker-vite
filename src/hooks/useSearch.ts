@@ -10,11 +10,11 @@ export const useSearch = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const searchBook = async (bookTitle: string) => {
+  const searchBook = async (bookTitle: string, author?: string, topic?: string) => {
     try {
       setLoading(true);
       setError(null);
-      const results = await SearchService.searchAllSources(bookTitle);
+      const results = await SearchService.searchAllSources(bookTitle, author, topic);
       setSearchResults(results);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');

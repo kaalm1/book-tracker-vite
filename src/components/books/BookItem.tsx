@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 interface BookItemProps {
   book: Book;
   onRemove: (bookId: string) => void;
-  onSearch: (bookTitle: string) => void;
+  onSearch: (bookTitle: string, author?: string, title?: string) => void;
   searchLoading?: boolean;
 }
 
@@ -27,7 +27,7 @@ export const BookItem: React.FC<BookItemProps> = ({
       
       <div className="flex items-center space-x-2">
         <Button
-          onClick={() => onSearch(book.title)}
+          onClick={() => onSearch(book.title, book.author, book.topic)}
           disabled={searchLoading}
           variant="success"
           size="sm"

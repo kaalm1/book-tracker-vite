@@ -28,8 +28,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     await removeBook(bookId);
   };
 
-  const handleSearchBook = async (bookTitle: string) => {
-    await searchBook(bookTitle);
+  const handleSearchBook = async (bookTitle: string, author?: string, topic?: string) => {
+    await searchBook(bookTitle, author, topic);
   };
 
   const handleNotifyMe = async (searchResult: any) => {
