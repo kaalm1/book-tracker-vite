@@ -1,4 +1,4 @@
-import { MAX, v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { SearchResult } from '../../types/search';
 import { defineSecret } from 'firebase-functions/params';
 import snoowrap from 'snoowrap';

@@ -1,6 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { MAX, v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { SearchResult } from '../../types/search';
 
 const MAX_RESULTS = 20; // Limit to 10 results for eBay
