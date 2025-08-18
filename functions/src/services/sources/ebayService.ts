@@ -1,7 +1,9 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { v4 as uuidv4 } from 'uuid';
+import { MAX, v4 as uuidv4 } from 'uuid';
 import { SearchResult } from '../../types/search';
+
+const MAX_RESULTS = 20; // Limit to 10 results for eBay
 
 
 export async function searcheBay(searchQuery: string): Promise<SearchResult[]> {
@@ -11,7 +13,7 @@ export async function searcheBay(searchQuery: string): Promise<SearchResult[]> {
     const results: SearchResult[] = [];
   
     $('.s-item').each((i, el) => {
-      if (i >= 10 || i === 0) return;
+      if (i >= MAX_RESULTS || i === 0) return;
   
       const $el = $(el);
       const title = $el.find('.s-item__title').text().trim();

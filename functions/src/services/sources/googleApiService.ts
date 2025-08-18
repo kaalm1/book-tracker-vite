@@ -53,6 +53,7 @@ interface DailyQuotaDoc {
 // Constants
 const MAX_DAILY_QUERIES = 90;
 const QUOTA_COLLECTION = 'google_api_quota';
+const MAX_RESULTS = 30; // Limit to 30 results per search
 
 /**
  * Get current date in YYYY-MM-DD format (local timezone)
@@ -210,7 +211,7 @@ async function searchGoogleApi(searchQuery: string, credentials?: {
             key: creds.apiKey,
             cx: creds.searchEngineId,
             q: strategy.query,
-            num: 10, // Number of results to return (max 10)
+            num: MAX_RESULTS, // Number of results to return
             start: 1,
             safe: 'medium',
             fields: 'items(title,link,snippet,displayLink,pagemap),searchInformation'

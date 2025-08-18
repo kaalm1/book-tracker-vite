@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { MAX, v4 as uuidv4 } from 'uuid';
 import { SearchResult } from '../../types/search';
 import { defineSecret } from 'firebase-functions/params';
 import snoowrap from 'snoowrap';
@@ -8,6 +8,8 @@ export const redditClientId = defineSecret('VITE_REDDIT_CLIENT_ID');
 export const redditClientSecret = defineSecret('VITE_REDDIT_CLIENT_SECRET');
 export const redditUsername = defineSecret('VITE_REDDIT_USERNAME');
 export const redditPassword = defineSecret('VITE_REDDIT_PASSWORD');
+
+const MAX_RESULTS = 15; // Limit to 5 results for Reddit
 
 
 export async function searchReddit(searchQuery: string, credentials?: {
@@ -44,7 +46,7 @@ export async function searchReddit(searchQuery: string, credentials?: {
         query: term,
         sort: 'new',
         time: 'month',
-        limit: 15
+        limit: MAX_RESULTS,
       });
   
       posts.forEach((post: any) => {
@@ -73,6 +75,6 @@ export async function searchReddit(searchQuery: string, credentials?: {
       i === self.findIndex(x => x.link === r.link)
     );
   
-    return uniqueResults.slice(0, 5);
+    return uniqueResults.slice(0, MAX_RESULTS);
   }
   

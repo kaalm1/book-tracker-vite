@@ -3,6 +3,8 @@ import * as cheerio from 'cheerio';
 import { v4 as uuidv4 } from 'uuid';
 import { SearchResult } from '../../types/search';
 
+const MAX_RESULTS = 20;
+
 
 export async function searchCraigslist(searchQuery: string): Promise<SearchResult[]> {
     const url = `https://craigslist.org/search/sss?query=${encodeURIComponent(searchQuery)}`;
@@ -11,7 +13,7 @@ export async function searchCraigslist(searchQuery: string): Promise<SearchResul
     const results: SearchResult[] = [];
   
     $('.result-row').each((i, el) => {
-      if (i >= 8) return;
+      if (i >= MAX_RESULTS) return;
   
       const $el = $(el);
       const title = $el.find('.result-title').text().trim();
